@@ -180,7 +180,7 @@ class CustomGoogleMap extends StatefulWidget {
 
 class _CustomGoogleMapState extends State<CustomGoogleMap> {
   GoogleMapController? googleMapController;
-  late CameraPosition intailCameraPosition;
+  late CameraPosition initialCameraPosition;
   late LocationService locationService;
   Set<Marker> mapMarkers = {};
   String nightMapStyle = "";
@@ -188,67 +188,77 @@ class _CustomGoogleMapState extends State<CustomGoogleMap> {
 
   @override
   void initState() {
-    locationService = LocationService();
-    intailCameraPosition = const CameraPosition(
-        target: LatLng(31.223143665392577, 29.976460680822758), zoom: 1);
-    updateLocation();
-    initMapStyle();
     super.initState();
+    locationService = LocationService();
+    initialCameraPosition = const CameraPosition(
+      target: LatLng(31.223143665392577, 29.976460680822758),
+      zoom: 1,
+    );
+    initMapStyle();
+    updateLocation();
   }
 
   void initMapStyle() async {
-    // 1 - load style data
+    // Load the map style asynchronously
     nightMapStyle = await DefaultAssetBundle.of(context)
         .loadString("assets/map_style/map_style.json");
-    setState(() {});
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GoogleMap(
-      initialCameraPosition: intailCameraPosition,
-      markers: mapMarkers,
-      style: nightMapStyle,
-      zoomControlsEnabled: false,
-      onMapCreated: (controller) {
-        googleMapController = controller;
-      },
-    );
+    if (mounted) setState(() {});
   }
 
   void updateLocation() async {
-    await locationService.checkAndRequestLocationService();
-    var hasPermission =
-        await locationService.checkAndRequestLocationPermission();
-    if (hasPermission) {
-      locationService.location.changeSettings(distanceFilter: 2);
-      locationService.getRealTimeLocationData((locationData) {
+    try {
+      // Listen to location updates
+      await locationService.getRealTimeLocationData((locationData) {
         setMyLocationMarker(locationData);
         updateCameraPosition(locationData);
       });
-    } else {}
+    } on LocationServiceException {
+      debugPrint("location service exception error");
+    } on LocationPermissionException {
+      debugPrint("location permission exception error");
+    } catch (e) {
+      debugPrint("unkwon error");
+    }
   }
 
   void updateCameraPosition(LocationData locationData) {
     if (isFirstCall) {
       var cameraPosition = CameraPosition(
-          target: LatLng(locationData.latitude!, locationData.longitude!),
-          zoom: 15);
+        target: LatLng(locationData.latitude!, locationData.longitude!),
+        zoom: 15,
+      );
       googleMapController
           ?.animateCamera(CameraUpdate.newCameraPosition(cameraPosition));
       isFirstCall = false;
     } else {
       googleMapController?.animateCamera(CameraUpdate.newLatLng(
-          LatLng(locationData.latitude!, locationData.longitude!)));
+        LatLng(locationData.latitude!, locationData.longitude!),
+      ));
     }
   }
 
   void setMyLocationMarker(LocationData locationData) {
     var myMarker = Marker(
-        markerId: const MarkerId("marker1"),
-        position: LatLng(locationData.latitude!, locationData.longitude!));
-    mapMarkers.add(myMarker);
-    setState(() {});
+      markerId: const MarkerId("marker1"),
+      position: LatLng(locationData.latitude!, locationData.longitude!),
+    );
+    setState(() {
+      mapMarkers.add(myMarker);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GoogleMap(
+      initialCameraPosition: initialCameraPosition,
+      markers: mapMarkers,
+      mapToolbarEnabled: false,
+      zoomControlsEnabled: false,
+      onMapCreated: (controller) {
+        googleMapController = controller;
+      },
+      style: nightMapStyle,
+    );
   }
 }
 
